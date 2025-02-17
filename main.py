@@ -34,8 +34,7 @@ def get_text_messages(message):
     else:
         bot.send_message(message.from_user.id, "Извините, я Вас не понимаю")
 
-bot.polling(none_stop=True, interval=0) #обязательная для работы бота часть
-
+bot.polling(none_stop=True, interval=0) 
 
 # Этот хэндлер будет срабатывать на команду "/help"
 @dp.message(Command(commands=['help']))
