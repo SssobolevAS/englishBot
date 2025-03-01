@@ -42,19 +42,28 @@ async def word_message2(message: Message):
 async def word_message3(message: Message):
     await message.answer( text="Запускаю режим переводчика")
 
-@dp.message(text=Message.text)
-async def translate(message:Message):
-    try:
-        translated = translator.translate(message.text, dest="en")
-        await message.answer(
-            f"Перевод:\n{hbold(translated.text)}"
-        )
-    except Exception as e:
-        await message.answer(f"Ошибка: {e}")
 
 
-async def main():
-    await dp.start_polling()
+
+@dp.message(F.text == 'Переводчик')
+async def user_text(message):
+    translator = Translator()
+
+    # Определение языка ввода.
+    lang = translator.detect(message.text)
+    lang = lang.lang
+
+    # Если ввод по русски, то перевести на английский по умолчанию.
+    # Если нужен другой язык, измени <message.text> на <message.text, dest='нужный язык'>.
+    if lang == 'ru':
+        send = translator.translate(message.text)
+        await bot.reply_to(message, '------\n'+ send.text +'\n------')
+
+    # Иначе другой язык перевести на русский {dest='ru'}.
+    else:
+        send = translator.translate(message.text, dest='ru')
+        await bot.reply_to(message, '------\n'+ send.text +'\n------')
+
 
 
 
@@ -70,7 +79,8 @@ async def process_help_command(message: Message):
 dp.message.register(word_message, F.text)
 dp.message.register(word_message2, F.text)
 dp.message.register(word_message3, F.text)
-
+dp.message.register(user_text, F.text)
+asyncio.run(bot.infinity_polling())
 
 if __name__ == '__main__':
     dp.run_polling(bot)
