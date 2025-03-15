@@ -1,17 +1,19 @@
-import asyncio
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from dotenv import load_dotenv
 import os
-from aiogram.utils.markdown import hbold
-from googletrans import Translator
-
+import logging
+from translate import Translator
 
 load_dotenv()
 bot = Bot(os.getenv('TOKEN'))
 dp = Dispatcher()
-translator = Translator()
+
+ru_letters = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'
+en_letters = 'abcdefghigkopqrstuvwxyz'
+
+
 
 @dp.message(Command(commands=["start"]))
 async def process_start_command(message: Message):
@@ -34,40 +36,29 @@ async def process_start_command(message: Message):
 async def word_message(message: Message):
     await message.answer( text="Сейчас пришлю список слов которые тебе нужно выучить")
 
+
 @dp.message(F.text == 'Грамматика')
 async def word_message2(message: Message):
     await message.answer( text="Сейчас пришлю задание по грамматике")
 
+
 @dp.message(F.text == 'Переводчик')
-async def word_message3(message: Message):
+async def echo(message: Message):
     await message.answer( text="Запускаю режим переводчика")
-
-
-
-
-@dp.message(F.text == 'Переводчик')
-async def user_text(message):
-    translator = Translator()
-
-    # Определение языка ввода.
-    lang = translator.detect(message.text)
-    lang = lang.lang
-
-    # Если ввод по русски, то перевести на английский по умолчанию.
-    # Если нужен другой язык, измени <message.text> на <message.text, dest='нужный язык'>.
-    if lang == 'ru':
-        send = translator.translate(message.text)
-        await bot.reply_to(message, '------\n'+ send.text +'\n------')
-
-    # Иначе другой язык перевести на русский {dest='ru'}.
+    text = message.text
+    if text[0].lower() in ru_letters:
+        translator = Translator(from_lang="russion", to_lang="english")
+    elif text[0].lower() in en_letters:
+        translator = Translator(from_lang="english", to_lang="russion")
     else:
-        send = translator.translate(message.text, dest='ru')
-        await bot.reply_to(message, '------\n'+ send.text +'\n------')
+        await message.answer('Я тебя не понимаю')
+        return
+    
+    translation = translator.translate(text)
+    await message.answer(translation)
 
 
-
-
-
+# Этот хэндлер будет срабатывать на команду "/help"
 @dp.message(Command(commands=['help']))
 async def process_help_command(message: Message):
     await message.answer(
@@ -78,9 +69,7 @@ async def process_help_command(message: Message):
 
 dp.message.register(word_message, F.text)
 dp.message.register(word_message2, F.text)
-dp.message.register(word_message3, F.text)
-dp.message.register(user_text, F.text)
-asyncio.run(bot.infinity_polling())
+dp.message.register(echo, F.text)
 
 if __name__ == '__main__':
     dp.run_polling(bot)
