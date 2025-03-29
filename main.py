@@ -1,3 +1,4 @@
+import sqlite3
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -5,10 +6,15 @@ import os
 from dotenv import load_dotenv
 import logging
 from translate import Translator
+from word import init_db, add_words_to_db, get_words_by_level  # Импортируем функции из word.py
 
 load_dotenv()
 bot = Bot(os.getenv('TOKEN'))
 dp = Dispatcher()
+
+# Инициализация базы данных и добавление слов
+init_db()
+add_words_to_db()
 
 questions = [
     {"question": "What is the correct form of the question?", "answers": ["Where are you from?", "What is your from?", "What from are you?", "Where you from?"], "correct_answer": "Where are you from?"},
@@ -36,6 +42,9 @@ translation_mode = {}
 
 # Storage for user answers and scores
 user_data = {}
+
+# Storage for user levels
+user_levels = {}
 
 @dp.message(Command(commands=["start"]))
 async def process_start_command(message: Message):
@@ -66,6 +75,8 @@ async def process_start_command(message: Message):
 @dp.message(F.text == 'C1 - Advanced')
 @dp.message(F.text == 'C2 - Proficiency')
 async def process_level_command(message: Message):
+    user_id = message.from_user.id
+    user_levels[user_id] = message.text  # Сохраняем уровень пользователя
     kb = [
         [KeyboardButton(text="Слова"), KeyboardButton(text="Грамматика"), KeyboardButton(text="Переводчик")]
     ]
@@ -130,7 +141,11 @@ async def calculate_result(user_id, message: Message):
 
 @dp.message(F.text == 'Слова')
 async def word_message(message: Message):
-    await message.answer(text="Сейчас пришлю список слов которые тебе нужно выучить")
+    user_id = message.from_user.id
+    level = user_levels.get(user_id, 'A1')  # По умолчанию уровень A1
+    words = get_words_by_level(level)
+    words_list = "\n".join([f"{english} - {translation}" for english, translation in words])
+    await message.answer(text=f"Вот список слов, которые тебе нужно выучить, и завтра в 13:30 я пришлю тебе тест по этим словам)\n {words}")
 
 @dp.message(F.text == 'Грамматика')
 async def word_message2(message: Message):
