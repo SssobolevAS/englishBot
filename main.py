@@ -1,4 +1,3 @@
-import sqlite3
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -6,15 +5,10 @@ import os
 from dotenv import load_dotenv
 import logging
 from translate import Translator
-from word import init_db, add_words_to_db, get_words_by_level  # Импортируем функции из word.py
 
 load_dotenv()
 bot = Bot(os.getenv('TOKEN'))
 dp = Dispatcher()
-
-# Инициализация базы данных и добавление слов
-init_db()
-add_words_to_db()
 
 questions = [
     {"question": "What is the correct form of the question?", "answers": ["Where are you from?", "What is your from?", "What from are you?", "Where you from?"], "correct_answer": "Where are you from?"},
@@ -34,16 +28,84 @@ questions = [
     {"question": " Fred _____ late yesterday, I saw his car next to the office.", "answers": ["can have worked", "must have worked", "should have worked", "must work"], "correct_answer": "must have worked"}
 ]
 
+word_a1 = [
+    "computer - компьютер", "internet - интернет", "email - электронная почта",
+    "website - веб-сайт", "software - программное обеспечение",
+    "hardware - аппаратное обеспечение", "mouse - мышь",
+    "keyboard - клавиатура", "screen - экран", "laptop - ноутбук",
+    "phone - телефон", "app - приложение", "browser - браузер",
+    "download - скачивать", "upload - загружать", "file - файл",
+    "folder - папка", "save - сохранять", "delete - удалять",
+    "copy - копировать"
+]
+
+word_a2 = [
+    "paste - вставлять", "password - пароль",
+    "user - пользователь", "account - аккаунт", "login - вход",
+    "logout - выход", "search - поиск", "link - ссылка",
+    "click - кликать", "double-click - двойной клик", "icon - иконка",
+    "window - окно", "desktop - рабочий стол", "printer - принтер",
+    "scan - сканировать", "print - печатать", "memory - память",
+    "storage - хранилище", "Wi-Fi (Wireless Fidelity) - технология беспроводной локальной сети", "cable - кабель"
+]
+
+word_b1 = [
+    
+    "network - сеть", "server - сервер", "database - база данных",
+    "firewall - межсетевой экран", "router - маршрутизатор",
+    "modem - модем", "bandwidth - пропускная способность",
+    "IP address (Internet Protocol) -  уникальный числовой идентификатор устройства", "domain - домен", "host - хост",
+    "protocol - протокол", "HTTP (HyperText Transfer Protocol) - протокол передачи данных в интернете", "HTTPS (HyperText Transfer Protocol Secure) -  расширение протокола HTTP",
+    "FTP (File Transfer Protocol) - протокол для передачи файлов между клиентом и сервером", " URL (Uniform Resource Locator) - унифицированный указатель ресурса", "DNS (Domain Name System) - система доменных имён", 
+    "proxy -  промежуточный сервер между пользователем интернета и серверами",
+    "VPN (Virtual Private Network) - виртуальная частная сеть", "encryption - шифрование", "decryption - дешифрование", "analytics - аналитика"
+]
+    
+word_b2 = [
+    "algorithm - алгоритм", "backup - резервное копирование",
+    "restore - восстановление", "patch - фрагмент кода", "update - обновление",
+    "driver - драйвер", "interface - интерфейс", "framework - фреймворк",
+    "library - библиотека", " API (Application Programming Interface) - набор правил и протоколов, который позволяет различным программным приложениям взаимодействовать друг с другом", "cloud - облако",
+    "virtual - виртуальный", "cluster - кластер", "load - нагрузка",
+    "balance - баланс", "cache - кэш", "cookie - небольшой текстовый файл",
+    "session -  определённый промежуток времени", "authentication - аутентификация",
+    "authorization - авторизация", "permission - разрешение",
+    "role - роль", "administrator - администратор"
+    ]
+
+word_c1 = [
+    "cybersecurity - кибербезопасность", "malware - вредоносное ПО",
+    "virus - вирус", "trojan - вид вредоносного программного обеспечения", "ransomware - программа-вымогатель",
+    "phishing - фишинг", "exploit - эксплойт", "vulnerability - уязвимость",
+    "penetration - проникновение", "intrusion - вторжение",
+    "forensics - судебная экспертиза", "cryptography - криптография",
+    "blockchain - блокчейн", "quantum computing - квантовые вычисления",
+    "artificial intelligence - искусственный интеллект",
+    "machine learning - машинное обучение", "deep learning - глубокое обучение",
+    "neural network - нейронная сеть", "data mining - майнинг данных",
+    "big data - большие данные"
+]
+word_c2 = [
+    "visualization - визуализация", "dashboard - панель управления",
+    "pipeline - конвейер", "ETL (Extract, transform, load) -  трёхэтапный вычислительный процесс", "data warehouse - хранилище данных",
+    "OLAP (On-Line Analytical Processing) - анализ данных в реальном времени", "business intelligence - бизнес-аналитика",
+    "agile - гибкий", "scrum - скрам (методика гибкого управления проектами)", "sprint - спринт (небольшой фиксированный отрезок времени)",
+    "backlog - бэклог (список задач, требований и функций, которые нужно выполнить для достижения целей проекта)", "kanban - канбан ( методология для управления задачами в IT-сфере)", "DevOps (Development Operations) - DevOps (методология взаимодействия разработчиков)",
+    "CI/CD (Continuous Integration, Continuous Delivery) - непрерывная интеграция и доставка", "containerization - контейнеризация",
+    "orchestration - оркестровка", "microservices - микросервисы",
+    "serverless - безсерверный", "edge computing - вычисления на краю",
+    "IoT (internet of things) - интернет вещей", "wearable - носимое устройство",
+    "augmented reality - дополненная реальность",
+    "virtual reality - виртуальная реальность"
+]
+
 ru_letters = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюя'
 en_letters = 'abcdefghigkopqrstuvwxyz'
 
 # Dictionary to track translation mode state for each user
 translation_mode = {}
 
-# Storage for user answers and scores
-user_data = {}
-
-# Storage for user levels
+# Track the selected level for each user
 user_levels = {}
 
 @dp.message(Command(commands=["start"]))
@@ -76,7 +138,7 @@ async def process_start_command(message: Message):
 @dp.message(F.text == 'C2 - Proficiency')
 async def process_level_command(message: Message):
     user_id = message.from_user.id
-    user_levels[user_id] = message.text  # Сохраняем уровень пользователя
+    user_levels[user_id] = message.text
     kb = [
         [KeyboardButton(text="Слова"), KeyboardButton(text="Грамматика"), KeyboardButton(text="Переводчик")]
     ]
@@ -142,11 +204,25 @@ async def calculate_result(user_id, message: Message):
 @dp.message(F.text == 'Слова')
 async def word_message(message: Message):
     user_id = message.from_user.id
-    level = user_levels.get(user_id, 'A1')  # По умолчанию уровень A1
-    words = get_words_by_level(level)
-    words_list = "\n".join([f"{english} - {translation}" for english, translation in words])
-    await message.answer(text=f"Вот список слов, которые тебе нужно выучить, и завтра в 13:30 я пришлю тебе тест по этим словам)\n {words}")
+    user_level = user_levels.get(user_id)
 
+    if user_level:
+        words_map = {
+            "A - Basic User": word_a1,
+            "A1 - Beginner": word_a1,
+            "A2 - Elementary": word_a2,
+            "B - Independent User": word_b1,
+            "B1 - Intermediate": word_b1,
+            "B2 - Upper-Intermediate": word_b2,
+            "C - Proficient User": word_c1,
+            "C1 - Advanced": word_c1,
+            "C2 - Proficiency": word_c2
+        }
+
+        words = words_map.get(user_level, [])
+        words_text = "\n".join(words)
+        await message.answer(text=f"Вот список слов для уровня {user_level}:\n\n{words_text}\n Завтра в 13.00 я пришлю тебе тест по словам)")
+        
 @dp.message(F.text == 'Грамматика')
 async def word_message2(message: Message):
     await message.answer(text="Сейчас пришлю задание по грамматике")
