@@ -28,7 +28,6 @@ grammar_a1 = (
 )
 
 grammar_a2 = (
-    
 )
 
 grammar_b1 = (
