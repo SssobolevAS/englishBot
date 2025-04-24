@@ -1,9 +1,9 @@
+import os
+import logging
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery, FSInputFile
-import os
 from dotenv import load_dotenv
-import logging
 from translate import Translator
 from word import *
 from w_test import *
@@ -11,7 +11,8 @@ import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, timedelta
 from aiogram.utils.markdown import text, bold, italic
-from gr import grammar_a, grammar_a1, grammar_a2, grammar_b1, grammar_b2, grammar_c1, grammar_c2
+from gr import *
+from grammar_tests import *
 
 load_dotenv()
 bot = Bot(os.getenv('TOKEN'))
@@ -24,6 +25,8 @@ en_letters = 'abcdefghigkopqrstuvwxyz'
 translation_mode = {}
 user_levels = {}
 user_data = {}
+
+logging.basicConfig(level=logging.INFO)
 
 @dp.message(Command(commands=["start"]))
 async def process_start_command(message: Message):
@@ -38,7 +41,7 @@ async def process_start_command(message: Message):
         [InlineKeyboardButton(text="Переводчик", callback_data="translator")]
     ]
     keyboard = InlineKeyboardMarkup(inline_keyboard=kb)
-    await message.answer('Привет! Я бот который поможет тебе учить английский в сфере IT, или просто помогу тебе перевести любое слово через кнопку "Переводчик".\n Для начала выбери свой уровень.\nЕсли не знаешь какой уровень у тебя, пройди тест', reply_markup=keyboard)
+    await message.answer('Привет! Я бот который поможет тебе учить английский в сфере IT, или просто помогу тебе перевести любое слово через кнопку "Переводчик"📚.\n Для начала выбери свой уровень.\nЕсли не знаешь какой уровень у тебя, пройди тест📝', reply_markup=keyboard)
 
 @dp.callback_query(lambda c: c.data.startswith('level_'))
 async def process_level_command(callback_query: CallbackQuery):
@@ -247,6 +250,7 @@ def get_next_level(current_level):
 async def on_startup(dp):
     scheduler.start()
 
+
 grammar_map = {
     "level_A": grammar_a,
     "level_A1": grammar_a1,
@@ -259,29 +263,141 @@ grammar_map = {
     "level_C2": grammar_c2
 }
 
-@dp.callback_query(F.text == 'grammar')
+
+@dp.callback_query(lambda c: c.data == 'grammar')
 async def word_message2(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     user_level = user_levels.get(user_id)
 
     if user_level:
         grammar_material = grammar_map.get(user_level, "Материал по грамматике недоступен для вашего уровня.")
-
-        # Отправляем текстовое сообщение
-        await callback_query.message.answer(text=f"Вот материал по грамматике для уровня *{user_level}*:\n\n{grammar_material}", parse_mode="Markdown")
-
-        # Отправляем картинку для уровней A2 и C1
+        await callback_query.message.answer(
+            text=f"Вот материал по грамматике для уровня *{user_level}*:\n\n{grammar_material}\n Завтра в 14:00 бот отправит тебе тест по этой теме",
+            parse_mode="Markdown"
+        )
         if user_level in ["level_A2", "level_C1"]:
-            photo_path = os.path.abspath(f'images/grammar_{user_level}.jpg')  # Абсолютный путь к картинке
-            if not os.path.exists(photo_path):
-                await callback_query.message.answer("Извините, картинка не найдена.")
+           
+            photo_path = os.path.join('images', f'grammar_{user_level}.jpg')
+            logging.info(f"Попытка отправки картинки: {photo_path}")
+
+            if os.access(os.path.dirname(photo_path), os.R_OK):
+                logging.info(f"Доступ к директории {os.path.dirname(photo_path)} разрешен.")
+            else:
+                logging.error(f"Доступ к директории {os.path.dirname(photo_path)} запрещен.")
+                await callback_query.message.answer("Извините, у бота нет прав доступа к директории с изображениями.")
                 return
-            photo = FSInputFile(photo_path)  # Используем FSInputFile
-            await callback_query.message.answer_photo(photo=photo, caption=f"Вот дополнительный материал по грамматике для уровня {user_level}.")
+
+            if os.path.exists(photo_path):
+                try:
+                    photo = FSInputFile(photo_path) 
+                    await callback_query.message.answer_photo(
+                        photo=photo,
+                        caption=f"Вот дополнительный материал по грамматике для уровня {user_level}."
+                    )
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке картинки: {e}")
+                    await callback_query.message.answer("Произошла ошибка при отправке картинки.")
+            else:
+                logging.warning(f"Картинка не найдена: {photo_path}")
+                await callback_query.message.answer("Извините, картинка не найдена.")
+
+        scheduler.add_job(send_grammar_test, 'cron', hour=14, minute=0, args=[user_id, user_level], id=f"grammar_test_job_{user_id}")
+
     else:
         await callback_query.message.answer(text="Пожалуйста, выберите свой уровень, чтобы получить материал по грамматике.")
 
     await callback_query.answer()
+
+async def send_grammar_test(user_id, user_level):
+    kb = [
+        [InlineKeyboardButton(text="Да", callback_data="ready_for_grammar_test")],
+        [InlineKeyboardButton(text="Нет", callback_data="not_ready_for_grammar_test")]
+    ]
+    keyboard = InlineKeyboardMarkup(inline_keyboard=kb)
+    await bot.send_message(user_id, "Готов ли ты проходить тест по грамматике?", reply_markup=keyboard)
+
+@dp.callback_query(lambda c: c.data == 'ready_for_grammar_test')
+async def start_grammar_test(callback_query: CallbackQuery):
+    user_id = callback_query.from_user.id
+    user_level = user_levels.get(user_id)
+
+    test_questions = grammar_tests.get(user_level, [])
+    user_data[user_id] = {"score": 0, "incorrect_answers": [], "current_question": 0}
+
+    await send_next_grammar_question(user_id, user_level)
+
+async def send_next_grammar_question(user_id, user_level):
+    user_data_entry = user_data.get(user_id)
+    if not user_data_entry:
+        return
+
+    current_question = user_data_entry["current_question"]
+    test_questions = grammar_tests.get(user_level, [])
+
+    if current_question < len(test_questions):
+        question_data = test_questions[current_question]
+        kb = [
+            [InlineKeyboardButton(text=option, callback_data=f"grammar_test_{current_question}_{option}")]
+            for option in question_data["options"]
+        ]
+        keyboard = InlineKeyboardMarkup(inline_keyboard=kb)
+
+        for row in kb:
+            for button in row:
+                if len(button.callback_data) > 64:
+                    raise ValueError(f"Callback data is too long: {button.callback_data}")
+
+        message = await bot.send_message(user_id, text=f"Вопрос {current_question + 1}: {question_data['question']}", reply_markup=keyboard)
+        user_data[user_id]["current_message_id"] = message.message_id
+    else:
+        await finish_grammar_test(user_id, user_level)
+
+@dp.callback_query(lambda c: c.data == 'not_ready_for_grammar_test')
+async def repeat_grammar_readiness_check(callback_query: CallbackQuery):
+    user_id = callback_query.from_user.id
+    kb = [
+        [InlineKeyboardButton(text="Да", callback_data="ready_for_grammar_test")],
+        [InlineKeyboardButton(text="Нет", callback_data="not_ready_for_grammar_test")]
+    ]
+    keyboard = InlineKeyboardMarkup(inline_keyboard=kb)
+    await bot.send_message(user_id, "Готов ли ты проходить тест по грамматике?", reply_markup=keyboard)
+
+@dp.callback_query(lambda c: c.data.startswith('grammar_test'))
+async def process_grammar_test_answer(callback_query: CallbackQuery):
+    user_id = callback_query.from_user.id
+    _, question_index, answer = callback_query.data.rsplit('_', 2)
+    question_index = int(question_index)
+
+    user_level = user_levels.get(user_id)
+    test_questions = grammar_tests.get(user_level, [])
+    correct_answer = test_questions[question_index]["correct"]
+
+    if answer != correct_answer:
+        user_data[user_id]["incorrect_answers"].append((test_questions[question_index]["question"], correct_answer))
+
+    await bot.edit_message_reply_markup(chat_id=str(user_id), message_id=user_data[user_id]["current_message_id"], reply_markup=None)
+
+    user_data[user_id]["current_question"] += 1
+    await send_next_grammar_question(user_id, user_level)
+
+async def finish_grammar_test(user_id, user_level):
+    incorrect_answers = user_data[user_id]["incorrect_answers"]
+    if incorrect_answers:
+        incorrect_text = "\n".join([f"{question}: {answer}" for question, answer in incorrect_answers])
+        await bot.send_message(user_id, f"Вот список вопросов по грамматике, в которых вы ошиблись:\n\n{incorrect_text}")
+
+        # Reschedule the test for the next day at 14:00
+        scheduler.add_job(send_grammar_test, 'cron', hour=14, minute=0, args=[user_id, user_level], id=f"grammar_test_job_{user_id}")
+    else:
+        await bot.send_message(user_id, "Поздравляю! Вы ответили правильно на все вопросы по грамматике!")
+
+        # Move to the next level
+        next_level = get_next_level(user_level)
+        if next_level:
+            user_levels[user_id] = next_level
+            await word_message2(CallbackQuery(from_user=types.User(id=user_id), data='grammar'))
+
+
 
 @dp.callback_query(lambda c: c.data == 'translator')
 async def activate_translation_mode(callback_query: CallbackQuery):
