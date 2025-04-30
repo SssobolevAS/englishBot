@@ -263,48 +263,41 @@ grammar_map = {
     "level_C2": grammar_c2
 }
 
-
 @dp.callback_query(lambda c: c.data == 'grammar')
-async def word_message2(callback_query: CallbackQuery):
+async def gr_message(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
     user_level = user_levels.get(user_id)
 
-    if user_level:
-        grammar_material = grammar_map.get(user_level, "Материал по грамматике недоступен для вашего уровня.")
-        await callback_query.message.answer(
-            text=f"Вот материал по грамматике для уровня *{user_level}*:\n\n{grammar_material}\n Завтра в 14:00 бот отправит тебе тест по этой теме",
-            parse_mode="Markdown"
-        )
-        if user_level in ["level_A2", "level_C1"]:
-           
-            photo_path = os.path.join('images', f'grammar_{user_level}.jpg')
-            logging.info(f"Попытка отправки картинки: {photo_path}")
+    grammar_material = grammar_map.get(user_level, "Грамматика для вашего уровня не найдена.")
+    if not isinstance(grammar_material, str):
+        grammar_material = str(grammar_material)
 
-            if os.access(os.path.dirname(photo_path), os.R_OK):
-                logging.info(f"Доступ к директории {os.path.dirname(photo_path)} разрешен.")
-            else:
-                logging.error(f"Доступ к директории {os.path.dirname(photo_path)} запрещен.")
-                await callback_query.message.answer("Извините, у бота нет прав доступа к директории с изображениями.")
-                return
+    await callback_query.message.answer(
+        text=f"Вот материал по грамматике для уровня *{user_level}*:\n\n{grammar_material}\n Завтра в 14:00 бот отправит тебе тест по этой теме",
+        parse_mode="Markdown"
+    )
 
-            if os.path.exists(photo_path):
-                try:
-                    photo = FSInputFile(photo_path) 
-                    await callback_query.message.answer_photo(
-                        photo=photo,
-                        caption=f"Вот дополнительный материал по грамматике для уровня {user_level}."
-                    )
-                except Exception as e:
-                    logging.error(f"Ошибка при отправке картинки: {e}")
-                    await callback_query.message.answer("Произошла ошибка при отправке картинки.")
-            else:
-                logging.warning(f"Картинка не найдена: {photo_path}")
-                await callback_query.message.answer("Извините, картинка не найдена.")
+    # Отправка фотографии для уровней A2 и C1
+    if user_level in ["level_A2", "level_C1"]:
+        # Формируем путь к файлу, используя os.path.join
+        photo_path = os.path.join('images', f'grammar_{user_level}.jpg')
+        logging.info(f"Попытка отправки картинки: {photo_path}")
 
-        scheduler.add_job(send_grammar_test, 'cron', hour=14, minute=0, args=[user_id, user_level], id=f"grammar_test_job_{user_id}")
+        if os.path.exists(photo_path):
+            try:
+                photo = FSInputFile(photo_path)
+                await callback_query.message.answer_photo(
+                    photo=photo,
+                    caption=f"Вот дополнительный материал по грамматике для уровня {user_level}."
+                )
+            except Exception as e:
+                logging.error(f"Ошибка при отправке картинки: {e}")
+                await callback_query.message.answer("Произошла ошибка при отправке картинки.")
+        else:
+            logging.warning(f"Картинка не найдена: {photo_path}")
+            await callback_query.message.answer("Извините, картинка не найдена.")
 
-    else:
-        await callback_query.message.answer(text="Пожалуйста, выберите свой уровень, чтобы получить материал по грамматике.")
+    scheduler.add_job(send_grammar_test, 'cron', hour=14, minute=0, args=[user_id, user_level], id=f"grammar_test_job_{user_id}")
 
     await callback_query.answer()
 
@@ -395,8 +388,16 @@ async def finish_grammar_test(user_id, user_level):
         next_level = get_next_level(user_level)
         if next_level:
             user_levels[user_id] = next_level
-            await word_message2(CallbackQuery(from_user=types.User(id=user_id), data='grammar'))
+            await gr_message(CallbackQuery(from_user=types.User(id=user_id), data='grammar'))
 
+def get_next_level(current_level):
+    # Пример функции для получения следующего уровня
+    levels = ["level_A", "level_A1", "level_A2", "level_B1", "level_B2", "level_C1", "level_C2"]
+    if current_level in levels:
+        current_index = levels.index(current_level)
+        if current_index < len(levels) - 1:
+            return levels[current_index + 1]
+    return None
 
 
 @dp.callback_query(lambda c: c.data == 'translator')
